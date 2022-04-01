@@ -5,16 +5,15 @@ const ERC20ABI =
     require("../artifacts/contracts/ERC20.sol/ERC20.json").abi;
 const PresaleABI =
     require("../artifacts/contracts/presale.sol/Presale.json").abi;
-
 async function main() {
     // get network
-    var [owner] = await ethers.getSigners();
-
+    let [owner] = await ethers.getSigners();
+    console.log(owner.address);
     let network = await owner.provider._networkPromise;
 
     //QE token deployment
     const ERC20TOKEN = await ethers.getContractFactory("ERC20");
-    const tokenContract = await ERC20TOKEN.deploy("Stress token", "token");
+    const tokenContract = await ERC20TOKEN.deploy("LUCKY SHIBA", "LShiba");
     await tokenContract.deployed();
 
     //presale deployment
@@ -31,6 +30,7 @@ async function main() {
 
     const PresaleContract = await ethers.getContractFactory("Presale");
     const presaleContract = await PresaleContract.deploy(tokenContract.address, owner.address, terms);
+
 
     // deployment result
     var contractObject = {
@@ -58,11 +58,3 @@ main()
         console.error(error);
         process.exit(1);
     });
-// verify()
-//     .then(() => {
-//         console.log("complete".green);
-//     })
-//     .catch((error) => {
-//         console.error(error);
-//         process.exit(1);
-//     });
