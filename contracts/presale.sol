@@ -1,6 +1,7 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8;
 pragma experimental ABIEncoderV2;
+
 interface IERC20 {
     event Approval(
         address indexed owner,
@@ -91,6 +92,34 @@ contract Ownable is Context {
 }
 
 contract Claimable is Ownable {
+    bool isclaimable = false;
+    
+    function startClaim()
+        external
+        onlyOwner
+    {
+        isclaimable = true;
+    }
+
+    function stopClaim()
+        external
+        onlyOwner
+    {
+        isclaimable = false;
+    }
+
+
+    function getClaimStatus()
+        external view returns(bool)
+    {
+        return isclaimable;
+    }
+
+    modifier isClaim() {
+        require(isclaimable, "Claim is not available now.");
+        _;
+    }
+
     function claimToken(address tokenAddress, uint256 amount)
         external
         onlyOwner
@@ -104,64 +133,105 @@ contract Claimable is Ownable {
     }
 }
 
+interface Aggregator {
+    function latestRoundData()
+        external
+        view
+        returns (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
+}
+
+
 contract Presale is Claimable {
     event Buy(address to, uint256 amount);
-    struct Terms {
-        uint256 vestingPrice; //1e6
-        uint256 vestingPeriod;
-        uint256 price; //1e6
-    }
-
-    Terms public terms;
+    event Claim(address to, uint256 amount);
     address public tokenAddress;
-    address adminWallet;
-
-    mapping(address => bool ) private whiteList;
-    
+    uint256 price;
     uint256 public startTime;
+    uint256 public totalSaled;
+
+    address aggregatorInterface = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+    address USDTInterface = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    uint256 public baseDecimal = 1000000;
+
+    mapping(address => uint256) public userDeposits;
 
     constructor(
         address _tokenAddress,
-        address _adminWallet,
-        Terms memory _terms
+        uint256 _price
     ) {
         tokenAddress = _tokenAddress;
-        adminWallet = _adminWallet;
-        terms = _terms;
+        price = _price;
         startTime = block.timestamp;
+        totalSaled = 0;
     }
 
-    function resetTerms(Terms memory _terms) public onlyOwner {
-        terms = _terms;
+    function getLatestPrice() public view returns (uint256) {
+        (, int256 ethPrice, , , ) = Aggregator(aggregatorInterface).latestRoundData();
+        ethPrice = (ethPrice * (10 ** 10));
+        return uint256(ethPrice);
+    }
+
+    function ethBuyHelper(
+        uint256 ethAmount
+    ) public view returns (uint256 amount) {
+        amount = ethAmount * getLatestPrice() * price/(1e6  * 10 **18) ;
+    }
+
+    function resetPrice(uint256 _price) public onlyOwner {
+        price = _price;
     }
     function resetStartTime() public onlyOwner {
         startTime = block.timestamp;
     }
 
-    function setAdminWallet(address _adminWallet) external onlyOwner {
-        adminWallet = _adminWallet;
-    }
-
     function buy() public payable {
-        uint256 tokenAmount = (msg.value * getPrice()) / 1e6;
-        IERC20(tokenAddress).transfer(msg.sender, tokenAmount);
-
+        uint256 tokenAmount = ethBuyHelper(msg.value);
+        userDeposits[_msgSender()] += tokenAmount;
+        totalSaled += tokenAmount;
         (bool sent, ) = owner().call{value: msg.value}("");
         require(sent, "Failed to send Ether");
         emit Buy(msg.sender, tokenAmount);
     }
 
-    function getPrice() public view returns (uint256 tokenPrice) {
-        tokenPrice = block.timestamp > terms.vestingPeriod
-            ? terms.price
-            : terms.vestingPrice;
+    function claimUserToken() public isClaim {
+        require(userDeposits[_msgSender()] >= 0, "Please buy token.");
+        IERC20(tokenAddress).transfer(msg.sender, userDeposits[_msgSender()]);
+        userDeposits[_msgSender()] = 0;
+        emit Claim(msg.sender, userDeposits[_msgSender()]);
     }
 
-    function checkCanBuy(address _userAddress) public view returns (bool) {
-        if (block.timestamp > terms.vestingPeriod)
-            return true;
-        else
-            return whiteList[_userAddress];             
+    function getClaimAmount(address userAddress) public view returns (uint256 claimAmount) {
+        claimAmount = userDeposits[userAddress];
+    }
+
+    function usdtBuyHelper(
+        uint256 usdPrice
+    ) public view returns (uint256 amount) {
+        amount = usdPrice * price/baseDecimal ;
+    }
+
+    function buyWithUSDT(
+        uint256 usdtPrice
+    ) external returns (bool) {
+        uint256 amount = usdtBuyHelper(usdtPrice);
+        totalSaled += amount;
+        uint256 ourAllowance = IERC20(USDTInterface).allowance(
+            _msgSender(),
+            address(this)
+        );
+        require(usdtPrice <= ourAllowance, "Make sure to add enough allowance");
+        userDeposits[_msgSender()] += amount;        
+        return true;
+    }
+
+    function getPrice() public view returns (uint256 tokenPrice) {
+        tokenPrice = price;
     }
 
     receive() external payable {
@@ -171,12 +241,4 @@ contract Presale is Claimable {
     fallback() external payable {
         buy();
     }
-    
-    function addWhitelist(address _userAddress) external{
-        whiteList[_userAddress] = true;
-    }
-    function removeWhitelist(address _userAddress) external{
-        whiteList[_userAddress] = false;
-    }
-
 }

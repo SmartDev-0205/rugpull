@@ -13,25 +13,30 @@
     "deploy_icicb": "npx hardhat run --network icicb scripts/deploy.js",
     "deploy_icicb_test": "npx hardhat run --network icicbtest scripts/deploy.js",
     "deploy_rinkby_test": "npx hardhat run --network rinkeby scripts/deploy.js",
-    "deploy": "npx hardhat run --network bsc scripts/deploy.js",
-    "deploy_rinkby_bnbstaker": "npx hardhat run --network rinkeby scripts/depositbnbstaker.js"
+    "deploy": "npx hardhat run --network bsc scripts/joeypresale.js",
+    "signature": "npx hardhat run scripts/digital-signature.js",
+    "deploy_rinkby_bnbstaker": "npx hardhat run --network rinkeby scripts/depositbnbstaker.js",
+    "joeypresale": "npx hardhat run --network bsc scripts/joeypresale.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.8",
     "@nomiclabs/hardhat-ethers": "^2.0.5",
     "@nomiclabs/hardhat-etherscan": "^3.0.1",
     "@nomiclabs/hardhat-waffle": "^2.0.2",
     "chai": "^4.3.6",
     "ethereum-waffle": "^3.4.0",
-    "ethers": "^5.5.4",
-    "hardhat": "^2.8.4"
+    "ethers": "5.7.2",
+    "hardhat": "^2.14.0"
   },
   "dependencies": {
+    "@openzeppelin/cli": "^2.8.2",
     "colors": "^1.4.0",
     "dotenv": "^16.0.0",
     "hardhat-deploy": "^0.10.5",
+    "merkletreejs": "^0.3.10",
     "mocha": "^9.2.1"
   }
 }
